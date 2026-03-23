@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# ltwmrc — LTWM configuration script
+# Chạy khi ltwm start. Gọi ltwmc để set mọi thứ.
+# Giống bspwmrc: đây là shell script bình thường.
+#
+# Reload: ltwmc reload  (hoặc Super+Shift+R trong sxhkdrc)
+#
+
+ltwmc() { /usr/local/bin/ltwmc "$@"; }
+
+# ── borders ────────────────────────────────────────────────
+ltwmc config border_width    2
+ltwmc config border_normal   '#45475A'
+ltwmc config border_focused  '#89B4FA'
+ltwmc config border_floating '#A6E3A1'
+
+# ── layout ─────────────────────────────────────────────────
+ltwmc config gap          6
+ltwmc config master_ratio 0.55
+
+# ── floating window default size ───────────────────────────
+ltwmc config float_default_w 900
+ltwmc config float_default_h 600
+
+# ── workspace names ─────────────────────────────────────────
+# số, emoji, nerd font — tuỳ font terminal hỗ trợ
+ltwmc config workspace_name '1 1'
+ltwmc config workspace_name '2 2'
+ltwmc config workspace_name '3 3'
+ltwmc config workspace_name '4 4'
+ltwmc config workspace_name '5 5'
+ltwmc config workspace_name '6 6'
+ltwmc config workspace_name '7 7'
+ltwmc config workspace_name '8 8'
+ltwmc config workspace_name '9 9'
+ltwmc config workspace_name '10 10'
+
+# Nerd font example:
+# ltwmc config workspace_name '1 '
+# ltwmc config workspace_name '2 '
+# ltwmc config workspace_name '3 '
+
+# ── autostart ───────────────────────────────────────────────
+# chạy 1 lần khi mới login ($1 không set hoặc = 0)
+# nếu reload thì bỏ qua autostart
+if [ "${1:-0}" -eq 0 ]; then
+    # wallpaper
+    feh --bg-fill ~/Pictures/Wallpapers/other/377026.jpg &
+    # compositor
+    picom &
+    # pywal
+    wal -i ~/Pictures/Wallpapers/other/377026.jpg -q &
+    # hotkey daemon
+    sxhkd &
+    # polybar
+    polybar &
+fi
