@@ -1,0 +1,67 @@
+#!/bin/sh
+# ltwmrc — LTWM config script
+# Reload: ltwmc reload
+
+ltwmc() { /usr/local/bin/ltwmc "$@"; }
+
+# ── borders ────────────────────────────────────────────────
+ltwmc config border_width    2
+ltwmc config border_normal   '#45475A'
+ltwmc config border_focused  '#89B4FA'
+ltwmc config border_floating '#A6E3A1'
+
+# ── layout ─────────────────────────────────────────────────
+ltwmc config gap          6
+ltwmc config master_ratio 0.55
+
+# ── float defaults ─────────────────────────────────────────
+ltwmc config float_default_w 900
+ltwmc config float_default_h 600
+
+# ── workspace names ─────────────────────────────────────────
+ltwmc config workspace_name '1 1'
+ltwmc config workspace_name '2 2'
+ltwmc config workspace_name '3 3'
+ltwmc config workspace_name '4 4'
+ltwmc config workspace_name '5 5'
+ltwmc config workspace_name '6 6'
+ltwmc config workspace_name '7 7'
+ltwmc config workspace_name '8 8'
+ltwmc config workspace_name '9 9'
+ltwmc config workspace_name '10 10'
+
+# ── bar ────────────────────────────────────────────────────
+# bật bar tích hợp (tắt polybar nếu dùng cái này)
+ltwmc config bar_enable      1
+ltwmc config bar_height      28
+ltwmc config bar_padding_x   4
+ltwmc config bar_font        'IosevkaNerdFont:size=12'
+# hoặc: ltwmc config bar_font 'JetBrainsMono Nerd Font:size=11'
+# hoặc: ltwmc config bar_font 'monospace:size=11'
+# pywal colors — đọc từ cache
+. ~/.cache/wal/colors.sh 2>/dev/null || true
+ltwmc config bar_bg              "${color0:-#1E1E2E}"
+ltwmc config bar_fg              "${foreground:-#CDD6F4}"
+ltwmc config bar_ws_active_bg    "${color4:-#89B4FA}"
+ltwmc config bar_ws_active_fg    "${color0:-#1E1E2E}"
+ltwmc config bar_ws_occupied_bg  "${color8:-#313244}"
+ltwmc config bar_ws_occupied_fg  "${foreground:-#CDD6F4}"
+# labels
+ltwmc config bar_show_layout  1
+ltwmc config bar_show_version 0
+
+# ── bar commands (right side) ──────────────────────────────
+ltwmc config bar_clear_cmds
+ltwmc config bar_cmd_sep ' | '
+ltwmc config bar_add_cmd 'iwgetid -r 2>/dev/null || echo "--"'
+ltwmc config bar_add_cmd 'amixer get Master 2>/dev/null | grep -oP "\d+(?=%)" | tail -1 | sed "s/^/ /"'
+ltwmc config bar_add_cmd 'cat /sys/class/power_supply/BAT0/capacity 2>/dev/null | sed "s/$/%/" || true'
+ltwmc config bar_add_cmd 'date "+%H:%M  %a %d/%m"'
+
+# ── autostart ───────────────────────────────────────────────
+if [ "${1:-0}" -eq 0 ]; then
+    feh --bg-fill ~/Pictures/Wallpapers/other/377026.jpg &
+    picom --config ~/.config/picom/picom.conf &
+    wal -i ~/Pictures/Wallpapers/other/377026.jpg -q &
+    sxhkd &
+fi
