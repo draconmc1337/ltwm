@@ -1,5 +1,0 @@
-[Desktop Entry]
-Name=LTWM
-Comment=Lightweight Tiling Window Manager
-Exec=ltwm
-Type=XSession

@@ -160,6 +160,7 @@ void wm_init(WM *wm) {
     adopt_existing(wm);
     for (int i = 0; i < MAX_WORKSPACES; i++) ws_tile(wm, i);
     client_focus(wm, wm->workspaces[0].clients);
+    if (wm->cfg.bar_enabled) bar_create(wm);
 
 
     ipc_init(wm);
@@ -243,6 +244,7 @@ void wm_run(WM *wm) {
 
 void wm_cleanup(WM *wm) {
     ipc_cleanup(wm);
+    bar_destroy(wm);
     for (int i = 0; i < MAX_WORKSPACES; i++) {
         Client *c = wm->workspaces[i].clients;
         while (c) {

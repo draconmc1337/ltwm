@@ -46,8 +46,15 @@
 #define IPC_MAX_CLIENTS      8
 #define CONFIG_PATH   "/.config/ltwm/ltwm.cfg"
 
+#define MAX_RULES       64
+#define BAR_MAX_CMDS    16
+#define BAR_MAX_BTNS    16
+
 typedef enum {
     LAYOUT_TILE = 0,
+    LAYOUT_VTILE,
+    LAYOUT_VSTRIPES,
+    LAYOUT_HSTRIPES,
     LAYOUT_MONOCLE,
     LAYOUT_FLOAT,
     LAYOUT_COUNT
@@ -78,6 +85,31 @@ typedef enum {
     ACTION_RELOAD,
 } ActionType;
 
+typedef struct {
+    char class[64];
+    char title[64];
+    int  workspace;
+    bool floating;
+    bool fullscreen;
+    bool center;
+} Rule;
+
+typedef struct {
+    char          cmd[MAX_CMD_LEN];
+    char          sep[16];
+    char          col_fg[16];
+    char          col_bg[16];
+    unsigned long fg;
+    unsigned long bg;
+} BarCmd;
+
+typedef struct {
+    char          icon[32];
+    char          cmd[MAX_CMD_LEN];
+    char          col_bg[16];
+    unsigned long bg;
+} BarBtn;
+
 typedef struct Client {
     Window  win;
     Window  frame;
@@ -90,6 +122,7 @@ typedef struct Client {
     bool fixed;
     char title[MAX_NAME_LEN];
     int  workspace;
+    int  ignore_unmap;
     struct Client *next;
     struct Client *prev;
 } Client;
@@ -149,6 +182,21 @@ typedef struct {
     int  float_default_h;
     char clock_fmt[64];
     bool bar_show_layout;
+    bool    bar_enabled;
+    bool    bar_show_cmds;
+    bool    bar_show_btns;
+    bool    bar_show_version;
+    char    bar_font[MAX_NAME_LEN];
+    int     bar_padding_x;
+    int     bar_padding_y;
+    bool    bar_show_workspaces;
+    char    bar_cmd_sep[16];
+    int     bar_n_cmds;
+    int     bar_n_btns;
+    BarCmd  bar_cmds[BAR_MAX_CMDS];
+    BarBtn  bar_btns[BAR_MAX_BTNS];
+    int     n_rules;
+    Rule    rules[MAX_RULES];
 } Config;
 
 typedef struct {
@@ -194,12 +242,12 @@ typedef struct {
     Atom        atom_net_wm_window_type_utility;
     Atom        atom_net_wm_window_type_splash;
     Atom        atom_net_wm_window_type_dock;
-    /* reserved screen area from docks/panels */
     int         strut_top, strut_bottom, strut_left, strut_right;
-
     Cursor      cursor_normal;
     Cursor      cursor_move;
     Cursor      cursor_resize;
+    time_t      bar_cmd_last[BAR_MAX_CMDS];
+    char        bar_cmd_cache[BAR_MAX_CMDS][256];
 } WM;
 
 /* wm.c */
@@ -245,6 +293,7 @@ void    client_remove(WM *wm, Client *c);
 void    client_add(WM *wm, Client *c);
 Client *client_get_master(WM *wm, int ws_id);
 void    client_swap_with_master(WM *wm, Client *c);
+void    apply_rules(WM *wm, Client *c);
 
 /* workspace.c */
 void ws_switch(WM *wm, int id);
@@ -264,10 +313,10 @@ KeySym       config_parse_keysym(const char *s);
 void bar_create(WM *wm);
 void bar_draw(WM *wm);
 void bar_destroy(WM *wm);
+void bar_handle_click(WM *wm, int x);
 
 /* ipc.c */
 void ipc_init(WM *wm);
-void ipc_event_emit(WM *wm, const char *event);
 void ipc_event_emit(WM *wm, const char *event);
 void ipc_poll(WM *wm);
 void ipc_cleanup(WM *wm);

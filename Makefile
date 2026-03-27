@@ -1,12 +1,12 @@
 CC      = gcc
 CFLAGS  = -std=c99 -Wall -Wextra -O2 -g -I./include \
-          $(shell pkg-config --cflags x11 xrandr 2>/dev/null)
-LDFLAGS = $(shell pkg-config --libs x11 xrandr 2>/dev/null) -lm
+          $(shell pkg-config --cflags x11 xrandr xft 2>/dev/null)
+LDFLAGS = $(shell pkg-config --libs x11 xrandr xft 2>/dev/null) -lm
 
 TARGET   = ltwm
 CLIENT   = ltwmc
 
-WM_SRCS  = src/wm.c src/events.c src/client.c src/workspace.c \
+WM_SRCS  = src/wm.c src/events.c src/client.c src/workspace.c src/bar.c \
            src/ipc.c src/spawn.c src/config.c src/util.c
 WM_OBJS  = $(WM_SRCS:.c=.o)
 

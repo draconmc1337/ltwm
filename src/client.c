@@ -135,11 +135,13 @@ void client_frame(WM *wm, Client *c) {
 /* ── remove frame, reparent back to root ────────────────── */
 void client_unframe(WM *wm, Client *c) {
     if (!c->frame) return;
-    XUnmapWindow(wm->dpy, c->frame);
+    Window frame = c->frame;
+    c->frame = None;  /* clear first to prevent re-entry */
+    XUnmapWindow(wm->dpy, frame);
+    /* reparent client back to root before destroying frame */
     XReparentWindow(wm->dpy, c->win, wm->root, c->x, c->y);
     XRemoveFromSaveSet(wm->dpy, c->win);
-    XDestroyWindow(wm->dpy, c->frame);
-    c->frame = None;
+    XDestroyWindow(wm->dpy, frame);
 }
 
 /* ── focus ──────────────────────────────────────────────── */

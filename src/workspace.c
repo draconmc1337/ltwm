@@ -89,8 +89,10 @@ void ws_tile(WM *wm, int id) {
 void ws_switch(WM *wm, int id) {
     if (id < 0 || id >= MAX_WORKSPACES || id == wm->cur_ws) return;
 
-    for (Client *c = wm->workspaces[wm->cur_ws].clients; c; c = c->next)
+    for (Client *c = wm->workspaces[wm->cur_ws].clients; c; c = c->next) {
+        c->ignore_unmap++;
         XUnmapWindow(wm->dpy, c->frame);
+    }
 
     wm->cur_ws = id;
 
@@ -115,6 +117,7 @@ void ws_move_client(WM *wm, Client *c, int id) {
 
     int old_ws = c->workspace;
     client_remove(wm, c);
+    c->ignore_unmap++;
     XUnmapWindow(wm->dpy, c->frame);
 
     c->workspace = id;
