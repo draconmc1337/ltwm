@@ -28,6 +28,9 @@ static int xerror_checkwm(Display *dpy, XErrorEvent *e) {
 
 static void sigchld_handler(int sig) {
     (void)sig;
+    /* WNOHANG: không block, chỉ reap những child đã exit sẵn.
+       SA_RESTART (set bên dưới) đảm bảo system calls như read/write
+       không bị EINTR interrupt — tránh wal/subprocess crash giữa chừng. */
     while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
@@ -107,7 +110,15 @@ void update_struts(WM *wm) {
 
 void wm_init(WM *wm) {
     memset(wm, 0, sizeof(WM));
-    signal(SIGCHLD, sigchld_handler);
+    /* Bug 1 fix: dùng sigaction + SA_RESTART thay signal() đơn giản.
+       SA_RESTART khiến các system call (read/write/select) tự restart sau
+       SIGCHLD thay vì trả EINTR — tránh wal -R và các app con bị crash
+       giữa chừng khi ltwm reap zombie. */
+    struct sigaction sa;
+    sa.sa_handler = sigchld_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa, NULL);
     signal(SIGTERM, SIG_DFL);
     signal(SIGINT,  SIG_DFL);
 
@@ -160,7 +171,8 @@ void wm_init(WM *wm) {
     adopt_existing(wm);
     for (int i = 0; i < MAX_WORKSPACES; i++) ws_tile(wm, i);
     client_focus(wm, wm->workspaces[0].clients);
-    if (wm->cfg.bar_enabled) bar_create(wm);
+    /* Bug 2 fix: bar_create đã chuyển sang wm_run(), sau khi ltwmrc chạy xong.
+       Làm vậy để workspace names (I II III...) đã được set trước khi bar draw lần đầu. */
 
 
     ipc_init(wm);
@@ -201,16 +213,23 @@ void wm_init(WM *wm) {
 }
 
 void wm_run(WM *wm) {
-    /* run ltwmrc — the shell script that configures ltwm via ltwmc */
+    /* run ltwmrc synchronously — đảm bảo config (workspace names, bar, autostart)
+       được áp dụng hoàn toàn trước khi event loop bắt đầu.
+       ltwmrc tự gọi `ltwmc autostart_run` ở cuối để spawn apps song song. */
     {
         const char *home = getenv("HOME"); if (!home) home = "/root";
         char rc[MAX_CMD_LEN];
         snprintf(rc, sizeof(rc), "%s/.config/ltwm/ltwmrc", home);
         if (access(rc, X_OK) == 0)
-            spawn(rc);
+            system(rc);   /* blocking — ltwmrc chạy xong mới vào event loop */
         else
             fprintf(stderr, "ltwm: ltwmrc not found at %s\n", rc);
     }
+
+    /* Bug 2 fix: tạo bar SAU khi ltwmrc chạy xong — workspace names (I II III...)
+       đã được set, bar draw đúng ngay từ lần đầu tiên, không còn flash "1 2 3". */
+    if (wm->cfg.bar_enabled && !wm->bar_win)
+        bar_create(wm);
 
     XEvent ev;
     time_t last_bar_tick = 0;

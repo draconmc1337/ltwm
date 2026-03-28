@@ -229,6 +229,7 @@ typedef struct {
     char        evt_path[108];
     IPCClient   ipc_clients[IPC_MAX_CLIENTS];
     char        ipc_path[108];
+    char        polybar_pipe[108];  /* path tới Polybar IPC pipe, "" = disabled */
     Atom        atom_wm_protocols;
     Atom        atom_wm_delete;
     Atom        atom_wm_take_focus;
@@ -312,6 +313,7 @@ KeySym       config_parse_keysym(const char *s);
 /* bar.c */
 void bar_create(WM *wm);
 void bar_draw(WM *wm);
+void polybar_push_workspaces(WM *wm);  /* push workspace string vào Polybar IPC pipe */
 void bar_destroy(WM *wm);
 void bar_handle_click(WM *wm, int x);
 

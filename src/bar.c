@@ -73,6 +73,30 @@ void bar_create(WM *wm) {
     wm->bar_gc = XCreateGC(wm->dpy, wm->bar_win, 0, NULL);
 
     XMapRaised(wm->dpy, wm->bar_win);
+
+    /* Bug 4 fix: set _NET_WM_WINDOW_TYPE_DOCK + _NET_WM_STRUT_PARTIAL
+       để ltwm (và các WM khác) biết đây là panel, không tile đè lên */
+    Atom wtype = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE", False);
+    Atom dock  = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+    XChangeProperty(wm->dpy, wm->bar_win, wtype, XA_ATOM, 32,
+                    PropModeReplace, (unsigned char*)&dock, 1);
+
+    /* strut_partial: [left, right, top, bottom, ...8 range fields] */
+    long strut[12] = {0};
+    strut[2] = bh;              /* top = bar height */
+    strut[8] = 0;               /* top_start_x */
+    strut[9] = wm->sw - 1;     /* top_end_x */
+    Atom sp = XInternAtom(wm->dpy, "_NET_WM_STRUT_PARTIAL", False);
+    XChangeProperty(wm->dpy, wm->bar_win, sp, XA_CARDINAL, 32,
+                    PropModeReplace, (unsigned char*)strut, 12);
+    Atom s = XInternAtom(wm->dpy, "_NET_WM_STRUT", False);
+    XChangeProperty(wm->dpy, wm->bar_win, s, XA_CARDINAL, 32,
+                    PropModeReplace, (unsigned char*)strut, 4);
+
+    /* re-read struts ngay để tile đúng từ đầu */
+    update_struts(wm);
+    for (int i = 0; i < MAX_WORKSPACES; i++) ws_tile(wm, i);
+
     wm->bar_visible = true;
     memset(wm->bar_cmd_cache, 0, sizeof(wm->bar_cmd_cache));
     memset(wm->bar_cmd_last,  0, sizeof(wm->bar_cmd_last));

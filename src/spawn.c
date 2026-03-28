@@ -14,8 +14,9 @@ void spawn(const char *cmd) {
 }
 
 void spawn_autostart(WM *wm) {
+    /* spawn tất cả song song, không usleep — X đã ready, không cần delay */
     for (int i = 0; i < wm->cfg.n_autostart; i++) {
+        if (!wm->cfg.autostart[i][0]) continue;
         spawn(wm->cfg.autostart[i]);
-        usleep(80000);
     }
 }

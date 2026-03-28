@@ -1,8 +1,7 @@
 #!/bin/sh
 #
 # ltwmrc — LTWM configuration script
-# Executed when ltwm starts. Use `ltwmc` to configure everything.
-# Similar to bspwmrc: this is a standard shell script.
+# Executed when ltwm starts (blocking — xong hết mới vào event loop).
 # Reload: ltwmc reload
 #
 
@@ -39,3 +38,26 @@ ltwmc config workspace_name '10 X'
 # ltwmc config workspace_name 'I '
 # ltwmc config workspace_name 'II '
 # ltwmc config workspace_name 'III '
+
+# ── autostart ───────────────────────────────────────────────
+# Dùng `ltwmc autostart "lệnh"` để queue các chương trình cần chạy lúc khởi động.
+# Tất cả sẽ được spawn song song (parallel) khi gọi `ltwmc autostart_run`.
+# KHÔNG cần & ở cuối — ltwm tự spawn background.
+#
+ltwmc autostart "sxhkd"
+ltwmc autostart "polybar"
+ltwmc autostart "feh --bg-fill ~/Pictures/Wallpapers/other/CherryBlossom.png"
+# ltwmc autostart "picom --daemon"
+# ltwmc autostart "dunst"
+# ltwmc autostart "nm-applet"
+
+# ── Polybar IPC integration ──────────────────────────────────
+# ltwm push workspace string THẲNG vào Polybar IPC pipe — không cần script.
+# Polybar config: type = custom/ipc, hook-0 = ltwmc bar_workspaces, initial = 1
+# Pipe path phải khớp với `ipc-pid-file` trong Polybar config (xem polybar-example.ini).
+# Comment dòng này ra nếu bạn dùng native bar của ltwm thay vì Polybar.
+ltwmc config polybar_pipe "/tmp/polybar_ltwm_ws.pipe"
+
+# ── spawn tất cả autostart apps song song ───────────────────
+# Đặt lệnh này CUỐI CÙNG, sau khi đã queue đủ hết.
+ltwmc autostart_run

@@ -129,6 +129,7 @@ void ws_switch(WM *wm, int id) {
 
     char buf[64]; snprintf(buf,sizeof(buf),"workspace %d",id+1);
     ipc_event_emit(wm,buf);
+    polybar_push_workspaces(wm);  /* push thẳng vào Polybar IPC pipe, 0 lag */
 }
 
 void ws_move_client(WM *wm, Client *c, int id) {

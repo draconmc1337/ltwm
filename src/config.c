@@ -21,7 +21,9 @@ void config_defaults(Config *cfg) {
     strncpy(cfg->col_bar_ws_active_fg,   "1E1E2E", 15);
     strncpy(cfg->col_bar_ws_occupied_bg, "313244", 15);
     strncpy(cfg->col_bar_ws_occupied_fg, "CDD6F4", 15);
-    strncpy(cfg->bar_font, "-misc-fixed-medium-r-normal--14-130-75-75-c-70-iso10646-1", MAX_NAME_LEN-1);
+    /* Xft format: "FontName:size=N" — hỗ trợ Nerd Fonts, Unicode, emoji
+       Fallback về monospace nếu IosevkaNerdFont chưa cài */
+    strncpy(cfg->bar_font, "IosevkaNerdFont:size=14", MAX_NAME_LEN-1);
 
     cfg->border_width      = DEFAULT_BORDER_WIDTH;
     cfg->gap               = DEFAULT_GAP;

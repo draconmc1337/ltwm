@@ -49,6 +49,7 @@ static int remove_client(WM *wm, Window win) {
         client_focus(wm, next);
     }
     if (wm->cfg.bar_enabled) bar_draw(wm);
+    polybar_push_workspaces(wm);  /* client count thay đổi → update Polybar */
     return ws;
 }
 
@@ -86,6 +87,7 @@ void on_map_request(WM *wm, XMapRequestEvent *e) {
     if (c->floating) client_center_on_screen(wm, c);
     client_focus(wm, c);
     if (wm->cfg.bar_enabled) bar_draw(wm);
+    polybar_push_workspaces(wm);  /* client mới → occupied dot thay đổi */
 }
 
 void on_unmap_notify(WM *wm, XUnmapEvent *e) {

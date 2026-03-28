@@ -113,6 +113,50 @@ void ipc_event_emit(WM *wm, const char *event) {
     }
 }
 
+/* ── build workspace string dùng màu từ config (dùng chung cho cả Polybar lẫn ltwmc) ── */
+static int build_ws_string(WM *wm, char *out, int outsz) {
+    int pos = 0;
+    char sa_fg[16], sa_bg[16], so_fg[16], so_bg[16];
+    snprintf(sa_fg, sizeof(sa_fg), "#%06lx", wm->cfg.bar_ws_active_fg   & 0xFFFFFF);
+    snprintf(sa_bg, sizeof(sa_bg), "#%06lx", wm->cfg.bar_ws_active_bg   & 0xFFFFFF);
+    snprintf(so_fg, sizeof(so_fg), "#%06lx", wm->cfg.bar_ws_occupied_fg & 0xFFFFFF);
+    snprintf(so_bg, sizeof(so_bg), "#%06lx", wm->cfg.bar_ws_occupied_bg & 0xFFFFFF);
+    for (int i = 0; i < MAX_WORKSPACES; i++) {
+        Workspace *ws = &wm->workspaces[i];
+        int cnt = 0;
+        for (Client *c = ws->clients; c; c = c->next) cnt++;
+        bool active   = (i == wm->cur_ws);
+        bool occupied = (cnt > 0);
+        if (!active && !occupied) continue;
+        pos += snprintf(out+pos, outsz-pos,
+            "%%{F%s}%%{B%s} %s %%{B-}%%{F-}",
+            active ? sa_fg : so_fg,
+            active ? sa_bg : so_bg,
+            ws->name);
+    }
+    return pos;
+}
+
+/* ── push workspace string trực tiếp vào Polybar IPC named pipe ────────────
+   Polybar config: type = custom/ipc   hook-0 = ltwmc bar_workspaces
+   Không cần script polling, ltwm push mỗi khi workspace thay đổi.       ── */
+void polybar_push_workspaces(WM *wm) {
+    if (!wm->polybar_pipe[0]) return;
+    int fd = open(wm->polybar_pipe, O_WRONLY | O_NONBLOCK);
+    if (fd < 0) return;   /* Polybar chưa chạy — bỏ qua, không crash */
+    char out[2048] = {0};
+    build_ws_string(wm, out, sizeof(out));
+    dprintf(fd, "%s\n", out);
+    close(fd);
+}
+
+/* ── bar_workspaces: ltwmc gọi để query, dùng cùng format builder ── */
+static void send_bar_workspaces(WM *wm, int fd) {
+    char out[2048] = {0};
+    build_ws_string(wm, out, sizeof(out));
+    dprintf(fd, "%s\n", out);
+}
+
 /* ── JSON status ────────────────────────────────────────── */
 static void send_status(WM *wm, int fd) {
     char buf[4096]; int pos=0;
@@ -170,6 +214,17 @@ void ipc_dispatch(WM *wm, int fd, const char *msg) {
     else if (!strcmp(cmd,"reload"))        { wm_reload_config(wm); }
     else if (!strcmp(cmd,"exec") && arg[0]){ spawn(arg); }
     else if (!strcmp(cmd,"getstatus"))     { send_status(wm,fd); return; }
+    else if (!strcmp(cmd,"bar_workspaces")){ send_bar_workspaces(wm,fd); return; }
+    else if (!strcmp(cmd,"autostart") && arg[0]) {
+        /* ltwmc autostart "cmd" — queue một lệnh để chạy khi autostart_run */
+        if (wm->cfg.n_autostart < MAX_AUTOSTART)
+            strncpy(wm->cfg.autostart[wm->cfg.n_autostart++], arg, MAX_CMD_LEN-1);
+    }
+    else if (!strcmp(cmd,"autostart_run")) {
+        /* ltwmc autostart_run — spawn tất cả đã queue, song song */
+        spawn_autostart(wm);
+        wm->cfg.n_autostart = 0; /* reset để reload không chạy 2 lần */
+    }
 
     /* ── workspace ────────────────────────────────────── */
     else if (!strcmp(cmd,"workspace")) {
@@ -267,6 +322,11 @@ void ipc_dispatch(WM *wm, int fd, const char *msg) {
         }
         else if (!strcmp(arg,"float_default_w")) wm->cfg.float_default_w=atoi(arg2);
         else if (!strcmp(arg,"float_default_h")) wm->cfg.float_default_h=atoi(arg2);
+        /* polybar IPC pipe path — ltwm push workspace string trực tiếp, không cần script */
+        else if (!strcmp(arg,"polybar_pipe")) {
+            strncpy(wm->polybar_pipe, arg2, sizeof(wm->polybar_pipe)-1);
+            polybar_push_workspaces(wm); /* push ngay lập tức sau khi set */
+        }
 
         /* bar */
         else if (!strcmp(arg,"bar_enable")) {
