@@ -121,17 +121,31 @@ static int btext(WM *wm, int x, const char *s,
 void bar_update_cmds(WM *wm) {
     time_t now = time(NULL);
     for (int i = 0; i < wm->cfg.bar_n_cmds; i++) {
-        if (now - wm->bar_cmd_last[i] < 1) continue;
-        FILE *f = popen(wm->cfg.bar_cmds[i].cmd, "r");
-        if (!f) { wm->bar_cmd_cache[i][0]='\0'; continue; }
-        if (!fgets(wm->bar_cmd_cache[i], 255, f))
-            wm->bar_cmd_cache[i][0]='\0';
-        else {
-            char *nl = strchr(wm->bar_cmd_cache[i],'\n');
-            if (nl) *nl='\0';
+        if (now - wm->bar_cmd_last[i] < 2) continue; /* 2s cache */
+        /* non-blocking: fork+exec, read with NONBLOCK fd */
+        int pfd[2];
+        if (pipe(pfd) < 0) continue;
+        pid_t pid = fork();
+        if (pid == 0) {
+            close(pfd[0]);
+            dup2(pfd[1], STDOUT_FILENO);
+            close(pfd[1]);
+            execl("/bin/sh","/bin/sh","-c",wm->cfg.bar_cmds[i].cmd,(char*)NULL);
+            _exit(127);
         }
-        pclose(f);
-        wm->bar_cmd_last[i] = now;
+        close(pfd[1]);
+        /* set read end nonblocking, try to read */
+        fcntl(pfd[0], F_SETFL, O_NONBLOCK);
+        char buf[256]={0};
+        int n=(int)read(pfd[0],buf,sizeof(buf)-1);
+        close(pfd[0]);
+        waitpid(pid,NULL,WNOHANG);
+        if (n>0) {
+            buf[n]='\0';
+            char *nl=strchr(buf,'\n'); if(nl)*nl='\0';
+            strncpy(wm->bar_cmd_cache[i],buf,255);
+        }
+        wm->bar_cmd_last[i]=now;
     }
 }
 

@@ -213,31 +213,38 @@ void wm_run(WM *wm) {
     }
 
     XEvent ev;
+    time_t last_bar_tick = 0;
     while (wm->running) {
-        /* drain all pending X events first */
+        /* drain all pending X events */
         while (XPending(wm->dpy)) {
             XNextEvent(wm->dpy, &ev);
             handle_event(wm, &ev);
         }
-        /* then check IPC without blocking */
+
+        /* select on X fd + IPC fd — block until something arrives */
+        fd_set rfds; FD_ZERO(&rfds);
+        int xfd = ConnectionNumber(wm->dpy);
+        FD_SET(xfd, &rfds);
+        int maxfd = xfd;
+        if (wm->ipc_fd >= 0) {
+            FD_SET(wm->ipc_fd, &rfds);
+            if (wm->ipc_fd > maxfd) maxfd = wm->ipc_fd;
+        }
+        /* 1s timeout only for bar clock refresh */
+        struct timeval tv = {1, 0};
+        struct timeval *tvp = wm->cfg.bar_enabled ? &tv : NULL;
+        select(maxfd+1, &rfds, NULL, NULL, tvp);
+
+        /* IPC */
         ipc_poll(wm);
 
-        /* block for next X event (short timeout so IPC stays responsive) */
-        if (!XPending(wm->dpy)) {
-            /* use select to wait on X fd and IPC fd simultaneously */
-            fd_set rfds; FD_ZERO(&rfds);
-            int xfd = ConnectionNumber(wm->dpy);
-            FD_SET(xfd, &rfds);
-            int maxfd = xfd;
-            if (wm->ipc_fd >= 0) {
-                FD_SET(wm->ipc_fd, &rfds);
-                if (wm->ipc_fd > maxfd) maxfd = wm->ipc_fd;
+        /* bar clock — only if a second has passed */
+        if (wm->cfg.bar_enabled && wm->bar_visible) {
+            time_t now = time(NULL);
+            if (now - last_bar_tick >= 1) {
+                last_bar_tick = now;
+                bar_draw(wm);
             }
-            struct timeval tv = {1, 0};   /* 1s timeout → clock refresh */
-            select(maxfd+1, &rfds, NULL, NULL, &tv);
-
-            /* clock tick: redraw bar every ~1s */
-        
         }
     }
 }
