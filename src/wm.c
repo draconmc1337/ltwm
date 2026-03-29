@@ -233,14 +233,14 @@ void wm_init(WM *wm) {
     XChangeProperty(wm->dpy, wmcheck, net_supporting, XA_WINDOW, 32,
                     PropModeReplace, (unsigned char*)&wmcheck, 1);
     XChangeProperty(wm->dpy, wmcheck, net_wm_name_ewmh, utf8_string, 8,
-                    PropModeReplace, (unsigned char*)"ltwm 0.11.0-alpha",
-                    sizeof("ltwm 0.11.0-alpha")-1);
+                    PropModeReplace, (unsigned char*)"ltwm 0.10.0-alpha",
+                    sizeof("ltwm 0.10.0-alpha")-1);
 
     XChangeProperty(wm->dpy, wm->root, net_supporting, XA_WINDOW, 32,
                     PropModeReplace, (unsigned char*)&wmcheck, 1);
     XChangeProperty(wm->dpy, wm->root, net_wm_name_ewmh, utf8_string, 8,
-                    PropModeReplace, (unsigned char*)"ltwm 0.11.0-alpha",
-                    sizeof("ltwm 0.11.0-alpha")-1);
+                    PropModeReplace, (unsigned char*)"ltwm 0.10.0-alpha",
+                    sizeof("ltwm 0.10.0-alpha")-1);
 
     /* advertise basic EWMH support */
     Atom supported[] = {

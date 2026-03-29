@@ -126,6 +126,48 @@ ltwmc config workspace_name '2 '     # Nerd Font icon example
 
 > Set all bar options **before** calling `bar_commit`. This ensures the bar is created once with the correct font and colors — no flash on startup.
 
+Full example with pywal + fallback colors:
+
+```sh
+# ── bar ─────────────────────────────────────────────────────
+ltwmc config bar_enable   1
+ltwmc config bar_height   28
+ltwmc config bar_padding_x 6
+ltwmc config bar_font     'JetBrains Mono:size=12'
+# other Xft font examples:
+# ltwmc config bar_font 'IosevkaNerdFont:size=14'
+# ltwmc config bar_font 'monospace:size=11'
+
+# read pywal colors — falls back to catppuccin mocha if not installed
+. "${HOME}/.cache/wal/colors.sh" 2>/dev/null || true
+ltwmc config bar_bg             "${color0:-#1E1E2E}"
+ltwmc config bar_fg             "${foreground:-#CDD6F4}"
+ltwmc config bar_ws_active_bg   "${color4:-#89B4FA}"
+ltwmc config bar_ws_active_fg   "${color0:-#1E1E2E}"
+ltwmc config bar_ws_occupied_bg "${color8:-#313244}"
+ltwmc config bar_ws_occupied_fg "${foreground:-#CDD6F4}"
+
+# left side
+ltwmc config bar_show_layout  1   # show current layout: []=  [v]  |||  ===
+ltwmc config bar_show_version 0   # show "ltwm x.x.x-alpha" — usually off
+
+# right side commands — each runs every 2 seconds, output shown separated by sep
+ltwmc config bar_clear_cmds           # clear any previously set commands
+ltwmc config bar_cmd_sep ' | '        # separator between command outputs
+
+ltwmc config bar_add_cmd 'iwgetid -r 2>/dev/null || echo "--"'
+ltwmc config bar_add_cmd 'amixer get Master 2>/dev/null | grep -oP "\d+(?=%)" | tail -1 | sed "s/^/vol: /"'
+ltwmc config bar_add_cmd 'cat /sys/class/power_supply/BAT0/capacity 2>/dev/null | sed "s/$/%/" || true'
+ltwmc config bar_add_cmd 'date "+%H:%M  %a %d/%m"'
+
+# custom CPU/RAM example (as seen in screenshot):
+# ltwmc config bar_add_cmd 'echo "CPU: $(grep -o "^[^ ]*" /proc/loadavg)%"'
+# ltwmc config bar_add_cmd 'free | awk "/Mem:/{printf \"RAM: %.0f%%\", \$3/\$2*100}"'
+
+# create bar — must be called LAST after all bar_* config above
+ltwmc config bar_commit
+```
+
 | Key | Value | Description |
 |-----|-------|-------------|
 | `bar_enable` | `0` / `1` | Enable native bar |
@@ -143,7 +185,7 @@ ltwmc config workspace_name '2 '     # Nerd Font icon example
 | `bar_cmd_sep` | string | Separator between right-side commands |
 | `bar_clear_cmds` | — | Clear all right-side commands |
 | `bar_add_cmd` | shell string | Add a right-side command (runs every 2s) |
-| `bar_commit` | — | Create/recreate bar with current config |
+| `bar_commit` | — | Create/recreate bar with current config — call this last |
 
 #### Polybar integration
 
@@ -348,4 +390,4 @@ ltwm/
 
 ## License
 
-GPL-3.0
+MIT

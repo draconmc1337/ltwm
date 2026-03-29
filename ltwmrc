@@ -73,9 +73,10 @@ ltwmc config bar_commit
 
 # ── autostart ────────────────────────────────────────────────
 # ltwm event loop is already running — & works fine here.
-sxhkd &
-# polybar &   # uncomment if using polybar instead of native bar
-feh --bg-fill "${HOME}/Pictures/Wallpapers/other/CherryBlossom.png" &
+#sxhkd &
+#ltwm-bar &         # standalone bar — reads state from ltwm IPC
+# polybar &       # alternative: use polybar with internal/xworkspaces
+#feh --bg-fill "${HOME}/Pictures/Wallpapers/other/CherryBlossom.png" &
 # picom --daemon &
 # dunst &
 # nm-applet &

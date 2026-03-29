@@ -171,6 +171,11 @@ static void client_focus_impl(WM *wm, Client *c, bool do_raise) {
                     XA_WINDOW, 32, PropModeReplace,
                     (unsigned char *)&c->win, 1);
 
+    /* notify ltwm-bar of new focused title */
+    char buf[MAX_NAME_LEN + 8];
+    snprintf(buf, sizeof(buf), "title %s", c->title);
+    ipc_event_emit(wm, buf);
+
 }
 
 /* focus + raise (dùng khi click, switch workspace, map window mới) */

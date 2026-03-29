@@ -5,6 +5,7 @@ LDFLAGS = $(shell pkg-config --libs x11 xrandr xft 2>/dev/null) -lm
 
 TARGET   = ltwm
 CLIENT   = ltwmc
+BAR      = ltwm-bar
 
 WM_SRCS  = src/wm.c src/events.c src/client.c src/workspace.c src/bar.c \
            src/ipc.c src/spawn.c src/config.c src/util.c
@@ -13,6 +14,9 @@ WM_OBJS  = $(WM_SRCS:.c=.o)
 CLI_SRC  = src/ltwmc.c
 CLI_OBJ  = src/ltwmc.o
 
+BAR_SRC  = src/ltwm-bar.c
+BAR_OBJ  = src/ltwm-bar.o
+
 PREFIX   = /usr/local
 BINDIR   = $(PREFIX)/bin
 CFGDIR   = $(HOME)/.config/ltwm
@@ -20,7 +24,7 @@ XSESSDIR = /usr/share/xsessions
 
 .PHONY: all clean install install-config uninstall
 
-all: $(TARGET) $(CLIENT)
+all: $(TARGET) $(CLIENT) $(BAR)
 
 $(TARGET): $(WM_OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)
@@ -28,15 +32,22 @@ $(TARGET): $(WM_OBJS)
 $(CLIENT): $(CLI_OBJ)
 	$(CC) -o $@ $^
 
+$(BAR): $(BAR_OBJ)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
 src/%.o: src/%.c include/ltwm.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 src/ltwmc.o: src/ltwmc.c
 	$(CC) -std=c99 -Wall -O2 -c -o $@ $<
 
+src/ltwm-bar.o: src/ltwm-bar.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 install: all
 	install -Dm755 $(TARGET)    $(BINDIR)/$(TARGET)
 	install -Dm755 $(CLIENT)    $(BINDIR)/$(CLIENT)
+	install -Dm755 $(BAR)       $(BINDIR)/$(BAR)
 	install -Dm755 ltwm.session $(BINDIR)/ltwm-session
 	install -Dm644 ltwm.desktop $(XSESSDIR)/ltwm.desktop
 
@@ -48,8 +59,9 @@ install-config:
 uninstall:
 	rm -f $(BINDIR)/$(TARGET)
 	rm -f $(BINDIR)/$(CLIENT)
+	rm -f $(BINDIR)/$(BAR)
 	rm -f $(BINDIR)/ltwm-session
 	rm -f $(XSESSDIR)/ltwm.desktop
 
 clean:
-	rm -f $(WM_OBJS) $(CLI_OBJ) $(TARGET) $(CLIENT)
+	rm -f $(WM_OBJS) $(CLI_OBJ) $(BAR_OBJ) $(TARGET) $(CLIENT) $(BAR)

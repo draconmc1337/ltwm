@@ -285,6 +285,13 @@ void on_property_notify(WM *wm, XPropertyEvent *e) {
     if (e->atom == wm->atom_wm_name || e->atom == wm->atom_net_wm_name) {
         client_update_title(wm, c);
         if (wm->cfg.bar_enabled) bar_draw(wm);
+        /* emit title event so ltwm-bar can update without polling */
+        Workspace *ws = &wm->workspaces[wm->cur_ws];
+        if (ws->focused == c) {
+            char buf[MAX_NAME_LEN + 8];
+            snprintf(buf, sizeof(buf), "title %s", c->title);
+            ipc_event_emit(wm, buf);
+        }
     }
 }
 
