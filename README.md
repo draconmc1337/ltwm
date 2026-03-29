@@ -1,11 +1,15 @@
-LTWM — Lightweight Tiling Window Manager
+# LTWM — Lightweight Tiling Window Manager
 
-⚠ Alpha software. LTWM is under active development. Expect bugs, missing features, and breaking config changes between versions. Not recommended as a daily driver yet — unless you enjoy fixing things.
+> **⚠ Alpha software.** LTWM is under active development. Expect bugs, missing features, and breaking config changes between versions. Not recommended as a daily driver yet — unless you enjoy fixing things.
 
-A minimal, fast X11 tiling window manager written in C. ~2200 lines of code.
-Configured via a shell script (ltwmrc) and controlled at runtime through a Unix socket IPC (ltwmc).
+A minimal, fast X11 tiling window manager written in C. ~2200 lines of code.  
+Configured via a shell script (`ltwmrc`) and controlled at runtime through a Unix socket IPC (`ltwmc`).
 
-ltwm 0.10.0-alpha
+```
+ltwm 0.11.0-alpha
+```
+
+---
 
 ## Features
 
@@ -29,10 +33,10 @@ ltwm 0.10.0-alpha
 | `libxrandr` | Multi-monitor support |
 | `libxft` | Font rendering in native bar |
 | `gcc`, `make` | Build |
-| `sxhkd` | Keybind daemon |
-| `polybar` | Status bar |
-| `feh` | Wallpaper  |
-| `picom` | Compositor |
+| `sxhkd` | Keybind daemon (recommended) |
+| `polybar` | Status bar (optional, native bar available) |
+| `feh` | Wallpaper (optional) |
+| `picom` | Compositor (optional) |
 
 ---
 
