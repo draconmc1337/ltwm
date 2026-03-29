@@ -288,10 +288,11 @@ void client_update_title(WM *wm, Client *c) {
 /* ── update border colour based on state ────────────────── */
 void client_update_border(WM *wm, Client *c) {
     if (!c || !c->frame) return;
-    Workspace *ws = &wm->workspaces[wm->cur_ws];
-    unsigned long col = (ws->focused == c && c->workspace == wm->cur_ws)
-        ? wm->cfg.border_active   /* active */
-        : wm->cfg.border_inactive;   /* inactive — tiling và floating đều như nhau */
+    /* use the client's own workspace to check focus —
+       avoids wrong color when ws_tile is called on a non-current workspace */
+    Workspace *ws = &wm->workspaces[c->workspace];
+    bool is_active = (ws->focused == c) && (c->workspace == wm->cur_ws);
+    unsigned long col = is_active ? wm->cfg.border_active : wm->cfg.border_inactive;
     XSetWindowBorder(wm->dpy, c->frame, col);
     XSetWindowBorderWidth(wm->dpy, c->frame,
                           c->fullscreen ? 0 : (unsigned)wm->cfg.border_width);

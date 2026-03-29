@@ -333,12 +333,16 @@ void ipc_dispatch(WM *wm, int fd, const char *msg) {
         else if (!strcmp(arg,"border_inactive")) {
             wm->cfg.border_inactive=parse_color(wm->dpy,wm->screen,arg2);
             strncpy(wm->cfg.col_border_inactive, arg2, 15);
-            for(Client*c=ws->clients;c;c=c->next) client_update_border(wm,c);
+            for(int i=0;i<MAX_WORKSPACES;i++)
+                for(Client*c=wm->workspaces[i].clients;c;c=c->next)
+                    client_update_border(wm,c);
         }
         else if (!strcmp(arg,"border_active")) {
             wm->cfg.border_active=parse_color(wm->dpy,wm->screen,arg2);
             strncpy(wm->cfg.col_border_active, arg2, 15);
-            for(Client*c=ws->clients;c;c=c->next) client_update_border(wm,c);
+            for(int i=0;i<MAX_WORKSPACES;i++)
+                for(Client*c=wm->workspaces[i].clients;c;c=c->next)
+                    client_update_border(wm,c);
         }
         else if (!strcmp(arg,"master_ratio")) {
             float r=atof(arg2);
