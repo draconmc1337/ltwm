@@ -1,13 +1,11 @@
-# LTWM — Lightweight Tiling Window Manager
+LTWM — Lightweight Tiling Window Manager
 
-A minimal, fast X11 tiling window manager written in C. ~2200 lines of code.  
-Configured via a shell script (`ltwmrc`) and controlled at runtime through a Unix socket IPC (`ltwmc`).
+⚠ Alpha software. LTWM is under active development. Expect bugs, missing features, and breaking config changes between versions. Not recommended as a daily driver yet — unless you enjoy fixing things.
 
-```
-ltwm 0.11.0-alpha
-```
+A minimal, fast X11 tiling window manager written in C. ~2200 lines of code.
+Configured via a shell script (ltwmrc) and controlled at runtime through a Unix socket IPC (ltwmc).
 
----
+ltwm 0.10.0-alpha
 
 ## Features
 
