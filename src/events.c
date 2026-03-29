@@ -267,7 +267,7 @@ void on_enter_notify(WM *wm, XCrossingEvent *e) {
     Client *c = client_find_by_win(wm, e->window);
     if (!c) c = client_find_by_frame(wm, e->window);
     if (c && c->workspace == wm->cur_ws)
-        client_focus(wm, c);
+        client_focus_no_raise(wm, c);  /* focus-follows-mouse, không raise */
 }
 
 void on_property_notify(WM *wm, XPropertyEvent *e) {

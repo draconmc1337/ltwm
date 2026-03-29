@@ -43,7 +43,7 @@
 #define DEFAULT_MASTER_RATIO  0.55f
 #define IPC_SOCKET_PATH_FMT  "/tmp/ltwm-%d.sock"
 #define IPC_MAX_MSG          1024
-#define IPC_MAX_CLIENTS      8
+#define IPC_MAX_CLIENTS      32
 #define CONFIG_PATH   "/.config/ltwm/ltwm.cfg"
 
 #define MAX_RULES       64
@@ -146,18 +146,16 @@ typedef struct {
 } Keybind;
 
 typedef struct {
-    unsigned long border_normal;
-    unsigned long border_focused;
-    unsigned long border_floating;
+    unsigned long border_active;
+    unsigned long border_inactive;
     unsigned long bar_bg;
     unsigned long bar_fg;
     unsigned long bar_ws_active_bg;
     unsigned long bar_ws_active_fg;
     unsigned long bar_ws_occupied_bg;
     unsigned long bar_ws_occupied_fg;
-    char col_border_normal[16];
-    char col_border_focused[16];
-    char col_border_floating[16];
+    char col_border_active[16];
+    char col_border_inactive[16];
     char col_bar_bg[16];
     char col_bar_fg[16];
     char col_bar_ws_active_bg[16];
@@ -243,6 +241,12 @@ typedef struct {
     Atom        atom_net_wm_window_type_utility;
     Atom        atom_net_wm_window_type_splash;
     Atom        atom_net_wm_window_type_dock;
+    /* EWMH desktop atoms — used by Polybar internal/xworkspaces */
+    Atom        atom_net_number_of_desktops;
+    Atom        atom_net_current_desktop;
+    Atom        atom_net_desktop_names;
+    Atom        atom_net_desktop_viewport;
+    Atom        atom_utf8_string;
     int         strut_top, strut_bottom, strut_left, strut_right;
     Cursor      cursor_normal;
     Cursor      cursor_move;
@@ -255,6 +259,7 @@ typedef struct {
 void wm_init(WM *wm);
 void update_struts(WM *wm);
 void wm_run(WM *wm);
+void ewmh_update_desktops(WM *wm);  /* update _NET_CURRENT_DESKTOP + _NET_DESKTOP_NAMES */
 void wm_cleanup(WM *wm);
 void wm_quit(WM *wm);
 void wm_reload_config(WM *wm);
@@ -278,7 +283,8 @@ void on_client_message(WM *wm, XClientMessageEvent *e);
 Client *client_new(WM *wm, Window win);
 void    client_frame(WM *wm, Client *c);
 void    client_unframe(WM *wm, Client *c);
-void    client_focus(WM *wm, Client *c);
+void    client_focus(WM *wm, Client *c);          /* focus + raise nếu floating */
+void    client_focus_no_raise(WM *wm, Client *c); /* focus only, không raise — dùng cho EnterNotify */
 void    client_kill(WM *wm, Client *c);
 void    client_set_floating(WM *wm, Client *c, bool floating);
 void    client_toggle_float(WM *wm, Client *c);

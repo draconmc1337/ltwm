@@ -53,6 +53,50 @@ static void cache_atoms(WM *wm) {
     wm->atom_net_wm_window_type_utility = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_UTILITY", False);
     wm->atom_net_wm_window_type_splash  = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_SPLASH", False);
     wm->atom_net_wm_window_type_dock    = XInternAtom(wm->dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+    /* EWMH desktop atoms */
+    wm->atom_net_number_of_desktops = XInternAtom(wm->dpy, "_NET_NUMBER_OF_DESKTOPS", False);
+    wm->atom_net_current_desktop    = XInternAtom(wm->dpy, "_NET_CURRENT_DESKTOP", False);
+    wm->atom_net_desktop_names      = XInternAtom(wm->dpy, "_NET_DESKTOP_NAMES", False);
+    wm->atom_net_desktop_viewport   = XInternAtom(wm->dpy, "_NET_DESKTOP_VIEWPORT", False);
+    wm->atom_utf8_string            = XInternAtom(wm->dpy, "UTF8_STRING", False);
+}
+
+/* update _NET_NUMBER_OF_DESKTOPS, _NET_CURRENT_DESKTOP, _NET_DESKTOP_NAMES
+   so Polybar internal/xworkspaces can read workspace info natively */
+void ewmh_update_desktops(WM *wm) {
+    /* number of desktops */
+    long n = MAX_WORKSPACES;
+    XChangeProperty(wm->dpy, wm->root, wm->atom_net_number_of_desktops,
+                    XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&n, 1);
+
+    /* current desktop (0-indexed) */
+    long cur = wm->cur_ws;
+    XChangeProperty(wm->dpy, wm->root, wm->atom_net_current_desktop,
+                    XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&cur, 1);
+
+    /* desktop names — packed UTF-8 strings separated by \0 */
+    char names[1024] = {0};
+    int pos = 0;
+    for (int i = 0; i < MAX_WORKSPACES; i++) {
+        const char *nm = wm->workspaces[i].name;
+        int len = (int)strlen(nm);
+        if (pos + len + 1 >= (int)sizeof(names)) break;
+        memcpy(names + pos, nm, len);
+        pos += len;
+        names[pos++] = '\0';
+    }
+    XChangeProperty(wm->dpy, wm->root, wm->atom_net_desktop_names,
+                    wm->atom_utf8_string, 8, PropModeReplace,
+                    (unsigned char*)names, pos);
+
+    /* viewport — all zeros (no virtual desktop panning) */
+    long vp[MAX_WORKSPACES * 2];
+    memset(vp, 0, sizeof(vp));
+    XChangeProperty(wm->dpy, wm->root, wm->atom_net_desktop_viewport,
+                    XA_CARDINAL, 32, PropModeReplace,
+                    (unsigned char*)vp, MAX_WORKSPACES * 2);
+
+    XFlush(wm->dpy);
 }
 
 static void adopt_existing(WM *wm) {
@@ -189,14 +233,14 @@ void wm_init(WM *wm) {
     XChangeProperty(wm->dpy, wmcheck, net_supporting, XA_WINDOW, 32,
                     PropModeReplace, (unsigned char*)&wmcheck, 1);
     XChangeProperty(wm->dpy, wmcheck, net_wm_name_ewmh, utf8_string, 8,
-                    PropModeReplace, (unsigned char*)"ltwm 0.10.0-alpha",
-                    sizeof("ltwm 0.10.0-alpha")-1);
+                    PropModeReplace, (unsigned char*)"ltwm 0.11.0-alpha",
+                    sizeof("ltwm 0.11.0-alpha")-1);
 
     XChangeProperty(wm->dpy, wm->root, net_supporting, XA_WINDOW, 32,
                     PropModeReplace, (unsigned char*)&wmcheck, 1);
     XChangeProperty(wm->dpy, wm->root, net_wm_name_ewmh, utf8_string, 8,
-                    PropModeReplace, (unsigned char*)"ltwm 0.10.0-alpha",
-                    sizeof("ltwm 0.10.0-alpha")-1);
+                    PropModeReplace, (unsigned char*)"ltwm 0.11.0-alpha",
+                    sizeof("ltwm 0.11.0-alpha")-1);
 
     /* advertise basic EWMH support */
     Atom supported[] = {
@@ -204,30 +248,33 @@ void wm_init(WM *wm) {
         wm->atom_net_wm_state, wm->atom_net_wm_state_fullscreen,
         wm->atom_net_active_window, wm->atom_net_wm_window_type,
         wm->atom_net_wm_window_type_dialog, wm->atom_net_wm_window_type_dock,
+        wm->atom_net_number_of_desktops, wm->atom_net_current_desktop,
+        wm->atom_net_desktop_names, wm->atom_net_desktop_viewport,
     };
     XChangeProperty(wm->dpy, wm->root, net_supported, XA_ATOM, 32,
                     PropModeReplace, (unsigned char*)supported,
                     sizeof(supported)/sizeof(Atom));
 
+    /* set initial desktop state so Polybar internal/xworkspaces works on startup */
+    ewmh_update_desktops(wm);
+
     XSync(wm->dpy, False);
 }
 
 void wm_run(WM *wm) {
-    /* run ltwmrc synchronously — đảm bảo config (workspace names, bar, autostart)
-       được áp dụng hoàn toàn trước khi event loop bắt đầu.
-       ltwmrc tự gọi `ltwmc autostart_run` ở cuối để spawn apps song song. */
+    /* ltwmrc chạy ASYNC — tuyệt đối không block event loop.
+       X phải xử lý MapRequest ngay lập tức, block ở đây = window ma. */
     {
         const char *home = getenv("HOME"); if (!home) home = "/root";
         char rc[MAX_CMD_LEN];
         snprintf(rc, sizeof(rc), "%s/.config/ltwm/ltwmrc", home);
         if (access(rc, X_OK) == 0)
-            system(rc);   /* blocking — ltwmrc chạy xong mới vào event loop */
+            spawn(rc);   /* async, không block */
         else
             fprintf(stderr, "ltwm: ltwmrc not found at %s\n", rc);
     }
 
-    /* Bug 2 fix: tạo bar SAU khi ltwmrc chạy xong — workspace names (I II III...)
-       đã được set, bar draw đúng ngay từ lần đầu tiên, không còn flash "1 2 3". */
+    /* bar_create ngay — tên workspace flash "1..10" vài ms là chấp nhận được */
     if (wm->cfg.bar_enabled && !wm->bar_win)
         bar_create(wm);
 

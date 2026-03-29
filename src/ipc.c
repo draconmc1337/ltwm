@@ -1,4 +1,5 @@
 #include "ltwm.h"
+#include <glob.h>
 
 /* ══════════════════════════════════════════════════════════
  *  IPC — Unix socket server
@@ -70,21 +71,39 @@ void ipc_poll(WM *wm) {
         FD_SET(wm->ipc_clients[i].fd, &rfds);
         if (wm->ipc_clients[i].fd > maxfd) maxfd=wm->ipc_clients[i].fd;
     }
-    struct timeval tv={0, 10000}; /* 10ms — no busy-poll */
+    struct timeval tv={0, 0}; /* non-blocking check */
     if (select(maxfd+1,&rfds,NULL,NULL,&tv)<=0) return;
 
+    /* drain TOÀN BỘ accept queue — không bỏ sót client nào */
     if (FD_ISSET(wm->ipc_fd,&rfds)) {
-        int cfd=accept(wm->ipc_fd,NULL,NULL);
-        if (cfd>=0) {
+        int cfd;
+        while ((cfd=accept(wm->ipc_fd,NULL,NULL))>=0) {
             fcntl(cfd,F_SETFL,fcntl(cfd,F_GETFL,0)|O_NONBLOCK);
-            for (int i=0;i<IPC_MAX_CLIENTS;i++)
+            bool placed = false;
+            for (int i=0;i<IPC_MAX_CLIENTS;i++) {
                 if (!wm->ipc_clients[i].active) {
                     wm->ipc_clients[i].fd=cfd;
                     wm->ipc_clients[i].active=true;
+                    placed = true;
                     break;
                 }
+            }
+            /* slot đầy — xử lý inline rồi close, không leak fd */
+            if (!placed) {
+                char buf[IPC_MAX_MSG]={0};
+                /* set blocking tạm để đọc lệnh */
+                fcntl(cfd,F_SETFL,fcntl(cfd,F_GETFL,0)&~O_NONBLOCK);
+                ssize_t n=read(cfd,buf,sizeof(buf)-1);
+                if (n>0) {
+                    buf[n]='\0';
+                    char *nl=strchr(buf,'\n'); if(nl)*nl='\0';
+                    ipc_dispatch(wm,cfd,buf);
+                }
+                close(cfd);
+            }
         }
     }
+
     for (int i=0;i<IPC_MAX_CLIENTS;i++) {
         if (!wm->ipc_clients[i].active) continue;
         int fd=wm->ipc_clients[i].fd;
@@ -137,20 +156,48 @@ static int build_ws_string(WM *wm, char *out, int outsz) {
     return pos;
 }
 
-/* ── push workspace string trực tiếp vào Polybar IPC named pipe ────────────
-   Polybar config: type = custom/ipc   hook-0 = ltwmc bar_workspaces
-   Không cần script polling, ltwm push mỗi khi workspace thay đổi.       ── */
+/* ── push workspace update to Polybar via its IPC socket ────────────────────
+   Polybar IPC: send "action:#module-name.hook.0" to its socket.
+   Socket path: /tmp/polybar_mqueue.<pid> — we glob for it.
+   ltwm pushes on every workspace/client change — zero lag, no polling.    ── */
 void polybar_push_workspaces(WM *wm) {
     if (!wm->polybar_pipe[0]) return;
-    int fd = open(wm->polybar_pipe, O_WRONLY | O_NONBLOCK);
-    if (fd < 0) return;   /* Polybar chưa chạy — bỏ qua, không crash */
-    char out[2048] = {0};
-    build_ws_string(wm, out, sizeof(out));
-    dprintf(fd, "%s\n", out);
-    close(fd);
+
+    /* build the workspace string */
+    char ws_str[2048] = {0};
+    build_ws_string(wm, ws_str, sizeof(ws_str));
+
+    /* Polybar IPC action format: "action:#<module>.hook.<N>\n"
+       We send hook 0 which re-runs hook-0 command (ltwmc bar_workspaces).
+       The module name is stored in polybar_pipe field when using IPC mode.
+       If polybar_pipe starts with '/', treat as legacy named pipe fallback. */
+    if (wm->polybar_pipe[0] == '/') {
+        /* legacy named pipe */
+        int fd = open(wm->polybar_pipe, O_WRONLY | O_NONBLOCK);
+        if (fd < 0) return;
+        char out[2060] = {0};
+        snprintf(out, sizeof(out), "%s\n", ws_str);
+        (void)write(fd, out, strlen(out));
+        close(fd);
+        return;
+    }
+
+    /* Polybar IPC socket mode — glob /tmp/polybar_mqueue.* */
+    glob_t gl;
+    if (glob("/tmp/polybar_mqueue.*", 0, NULL, &gl) != 0) return;
+    for (size_t i = 0; i < gl.gl_pathc; i++) {
+        int fd = open(gl.gl_pathv[i], O_WRONLY | O_NONBLOCK);
+        if (fd < 0) continue;
+        /* send hook trigger — polybar re-runs hook-0 = ltwmc bar_workspaces */
+        char msg[128];
+        snprintf(msg, sizeof(msg), "action:#%s.hook.0\n", wm->polybar_pipe);
+        (void)write(fd, msg, strlen(msg));
+        close(fd);
+    }
+    globfree(&gl);
 }
 
-/* ── bar_workspaces: ltwmc gọi để query, dùng cùng format builder ── */
+/* ── bar_workspaces: ltwmc query, same format builder ── */
 static void send_bar_workspaces(WM *wm, int fd) {
     char out[2048] = {0};
     build_ws_string(wm, out, sizeof(out));
@@ -283,16 +330,14 @@ void ipc_dispatch(WM *wm, int fd, const char *msg) {
             wm->cfg.gap=atoi(arg2);
             ws_tile(wm,wm->cur_ws);  /* only cur_ws */
         }
-        else if (!strcmp(arg,"border_normal")) {
-            wm->cfg.border_normal=parse_color(wm->dpy,wm->screen,arg2);
+        else if (!strcmp(arg,"border_inactive")) {
+            wm->cfg.border_inactive=parse_color(wm->dpy,wm->screen,arg2);
+            strncpy(wm->cfg.col_border_inactive, arg2, 15);
             for(Client*c=ws->clients;c;c=c->next) client_update_border(wm,c);
         }
-        else if (!strcmp(arg,"border_focused")) {
-            wm->cfg.border_focused=parse_color(wm->dpy,wm->screen,arg2);
-            for(Client*c=ws->clients;c;c=c->next) client_update_border(wm,c);
-        }
-        else if (!strcmp(arg,"border_floating")) {
-            wm->cfg.border_floating=parse_color(wm->dpy,wm->screen,arg2);
+        else if (!strcmp(arg,"border_active")) {
+            wm->cfg.border_active=parse_color(wm->dpy,wm->screen,arg2);
+            strncpy(wm->cfg.col_border_active, arg2, 15);
             for(Client*c=ws->clients;c;c=c->next) client_update_border(wm,c);
         }
         else if (!strcmp(arg,"master_ratio")) {
@@ -331,14 +376,9 @@ void ipc_dispatch(WM *wm, int fd, const char *msg) {
         /* bar */
         else if (!strcmp(arg,"bar_enable")) {
             bool en=!!atoi(arg2);
-            if (en && !wm->bar_win) {
-                wm->cfg.bar_enabled=true;
-                config_apply_colors(wm);
-                bar_create(wm);
-                update_struts(wm);
-                ws_tile(wm,wm->cur_ws);
-            } else if (!en && wm->bar_win) {
-                wm->cfg.bar_enabled=false;
+            wm->cfg.bar_enabled=en;
+            /* creation deferred to bar_commit — avoids partial config flash */
+            if (!en && wm->bar_win) {
                 bar_destroy(wm);
                 update_struts(wm);
                 ws_tile(wm,wm->cur_ws);
@@ -350,7 +390,20 @@ void ipc_dispatch(WM *wm, int fd, const char *msg) {
         }
         else if (!strcmp(arg,"bar_font")) {
             strncpy(wm->cfg.bar_font,arg2,MAX_NAME_LEN-1);
+            /* if bar already running, recreate with new font */
             if (wm->bar_win) { bar_destroy(wm); bar_create(wm); }
+            /* if not running, bar_commit will create it */
+        }
+        else if (!strcmp(arg,"bar_commit")) {
+            /* create bar with all config applied — call this at end of ltwmrc
+               after bar_enable, bar_font, bar_bg, bar_fg etc. are all set */
+            if (wm->cfg.bar_enabled) {
+                if (wm->bar_win) { bar_destroy(wm); }
+                config_apply_colors(wm);
+                bar_create(wm);
+                update_struts(wm);
+                ws_tile(wm, wm->cur_ws);
+            }
         }
         else if (!strcmp(arg,"bar_padding_x"))  { wm->cfg.bar_padding_x=atoi(arg2); bar_draw(wm); }
         else if (!strcmp(arg,"bar_bg"))          { strncpy(wm->cfg.col_bar_bg,arg2+(arg2[0]=='#'),15); config_apply_colors(wm); bar_draw(wm); }

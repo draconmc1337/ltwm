@@ -94,9 +94,7 @@ void client_frame(WM *wm, Client *c) {
     c->fw = c->w + 2*bw;
     c->fh = c->h + 2*bw;
 
-    unsigned long border_col = c->floating
-        ? wm->cfg.border_floating
-        : wm->cfg.border_normal;
+    unsigned long border_col = wm->cfg.border_inactive;
 
     XSetWindowAttributes swa;
     swa.border_pixel     = border_col;
@@ -145,7 +143,7 @@ void client_unframe(WM *wm, Client *c) {
 }
 
 /* ── focus ──────────────────────────────────────────────── */
-void client_focus(WM *wm, Client *c) {
+static void client_focus_impl(WM *wm, Client *c, bool do_raise) {
     Workspace *ws = &wm->workspaces[wm->cur_ws];
 
     /* un-highlight old focus */
@@ -159,8 +157,8 @@ void client_focus(WM *wm, Client *c) {
     }
 
     XSetInputFocus(wm->dpy, c->win, RevertToPointerRoot, CurrentTime);
-    /* only raise floating/fullscreen — tiled windows stay in place to avoid flicker */
-    if (c->floating || c->fullscreen)
+    /* raise floating/fullscreen chỉ khi được yêu cầu (click), không raise khi lia chuột */
+    if (do_raise && (c->floating || c->fullscreen))
         XRaiseWindow(wm->dpy, c->frame);
     client_update_border(wm, c);
 
@@ -173,6 +171,17 @@ void client_focus(WM *wm, Client *c) {
                     XA_WINDOW, 32, PropModeReplace,
                     (unsigned char *)&c->win, 1);
 
+}
+
+/* focus + raise (dùng khi click, switch workspace, map window mới) */
+void client_focus(WM *wm, Client *c) {
+    client_focus_impl(wm, c, true);
+}
+
+/* focus only, KHÔNG raise — dùng cho EnterNotify (lia chuột)
+   floating window phía sau vẫn active nhưng không nhảy lên trên */
+void client_focus_no_raise(WM *wm, Client *c) {
+    client_focus_impl(wm, c, false);
 }
 
 /* ── kill window ────────────────────────────────────────── */
@@ -280,13 +289,9 @@ void client_update_title(WM *wm, Client *c) {
 void client_update_border(WM *wm, Client *c) {
     if (!c || !c->frame) return;
     Workspace *ws = &wm->workspaces[wm->cur_ws];
-    unsigned long col;
-    if (ws->focused == c && c->workspace == wm->cur_ws)
-        col = wm->cfg.border_focused;
-    else if (c->floating)
-        col = wm->cfg.border_floating;
-    else
-        col = wm->cfg.border_normal;
+    unsigned long col = (ws->focused == c && c->workspace == wm->cur_ws)
+        ? wm->cfg.border_active   /* active */
+        : wm->cfg.border_inactive;   /* inactive — tiling và floating đều như nhau */
     XSetWindowBorder(wm->dpy, c->frame, col);
     XSetWindowBorderWidth(wm->dpy, c->frame,
                           c->fullscreen ? 0 : (unsigned)wm->cfg.border_width);

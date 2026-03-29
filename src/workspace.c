@@ -129,7 +129,8 @@ void ws_switch(WM *wm, int id) {
 
     char buf[64]; snprintf(buf,sizeof(buf),"workspace %d",id+1);
     ipc_event_emit(wm,buf);
-    polybar_push_workspaces(wm);  /* push thẳng vào Polybar IPC pipe, 0 lag */
+    polybar_push_workspaces(wm);
+    ewmh_update_desktops(wm);  /* update _NET_CURRENT_DESKTOP for Polybar internal/xworkspaces */
 }
 
 void ws_move_client(WM *wm, Client *c, int id) {
@@ -170,10 +171,20 @@ void ws_focus_dir(WM *wm, int dir) {
 }
 
 void ws_cycle_layout(WM *wm) {
-    Workspace *ws=&wm->workspaces[wm->cur_ws];
-    ws->layout=(Layout)(((int)ws->layout+1)%(int)LAYOUT_COUNT);
-    ws_tile(wm,wm->cur_ws);
-    const char *names[]={"tile","vtile","vstripes","hstripes","monocle","float"};
-    char buf[64]; snprintf(buf,sizeof(buf),"layout %s",names[(int)ws->layout]);
-    ipc_event_emit(wm,buf);
+    Workspace *ws = &wm->workspaces[wm->cur_ws];
+    /* chỉ cycle 4 layout tiling: Tile → VTile → VStripes → HStripes → Tile...
+       Monocle và Float không nằm trong vòng cycle — set thủ công nếu muốn */
+    const Layout cycle[] = {
+        LAYOUT_TILE, LAYOUT_VTILE, LAYOUT_VSTRIPES, LAYOUT_HSTRIPES
+    };
+    const int ncycle = 4;
+    int cur = 0;
+    for (int i = 0; i < ncycle; i++)
+        if (ws->layout == cycle[i]) { cur = i; break; }
+    ws->layout = cycle[(cur + 1) % ncycle];
+    ws_tile(wm, wm->cur_ws);
+    const char *names[] = {"tile","vtile","vstripes","hstripes","monocle","float"};
+    char buf[64]; snprintf(buf, sizeof(buf), "layout %s", names[(int)ws->layout]);
+    ipc_event_emit(wm, buf);
+    polybar_push_workspaces(wm);
 }

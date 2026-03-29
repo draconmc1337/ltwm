@@ -1,28 +1,26 @@
 #!/bin/sh
 #
 # ltwmrc — LTWM configuration script
-# Executed when ltwm starts (blocking — xong hết mới vào event loop).
+# Runs async alongside the event loop on startup.
 # Reload: ltwmc reload
 #
 
 ltwmc() { /usr/local/bin/ltwmc "$@"; }
 
-# ── borders ────────────────────────────────────────────────
+# ── borders ─────────────────────────────────────────────────
 ltwmc config border_width 2
-ltwmc config border_normal '#45475A'
-ltwmc config border_focused '#89B4FA'
-ltwmc config border_floating '#A6E3A1'
+ltwmc config border_active   '#89B4FA'
+ltwmc config border_inactive '#45475A'
 
-# ── layout ─────────────────────────────────────────────────
+# ── layout ──────────────────────────────────────────────────
 ltwmc config gap 6
 ltwmc config master_ratio 0.55
 
-# ── floating window default size ───────────────────────────
+# ── floating window default size ────────────────────────────
 ltwmc config float_default_w 900
 ltwmc config float_default_h 600
 
-# ── workspace names ─────────────────────────────────────────
-# Numbers, emojis, or Nerd Fonts — depends on your terminal font support
+# ── workspace names ──────────────────────────────────────────
 ltwmc config workspace_name '1 I'
 ltwmc config workspace_name '2 II'
 ltwmc config workspace_name '3 III'
@@ -34,30 +32,50 @@ ltwmc config workspace_name '8 VIII'
 ltwmc config workspace_name '9 IX'
 ltwmc config workspace_name '10 X'
 
-# Nerd Font example:
-# ltwmc config workspace_name 'I '
-# ltwmc config workspace_name 'II '
-# ltwmc config workspace_name 'III '
-
-# ── autostart ───────────────────────────────────────────────
-# Dùng `ltwmc autostart "lệnh"` để queue các chương trình cần chạy lúc khởi động.
-# Tất cả sẽ được spawn song song (parallel) khi gọi `ltwmc autostart_run`.
-# KHÔNG cần & ở cuối — ltwm tự spawn background.
+# ── bar ─────────────────────────────────────────────────────
+# Set ALL bar config first, then call bar_commit to create bar in one shot.
+# This prevents partial config flash (wrong font/color on startup).
 #
-ltwmc autostart "sxhkd"
-ltwmc autostart "polybar"
-ltwmc autostart "feh --bg-fill ~/Pictures/Wallpapers/other/CherryBlossom.png"
-# ltwmc autostart "picom --daemon"
-# ltwmc autostart "dunst"
-# ltwmc autostart "nm-applet"
+# To use native bar: bar_enable 1, comment out polybar in autostart.
+# To use polybar:    bar_enable 0, keep polybar in autostart.
 
-# ── Polybar IPC integration ──────────────────────────────────
-# ltwm push workspace string THẲNG vào Polybar IPC pipe — không cần script.
-# Polybar config: type = custom/ipc, hook-0 = ltwmc bar_workspaces, initial = 1
-# Pipe path phải khớp với `ipc-pid-file` trong Polybar config (xem polybar-example.ini).
-# Comment dòng này ra nếu bạn dùng native bar của ltwm thay vì Polybar.
-ltwmc config polybar_pipe "/tmp/polybar_ltwm_ws.pipe"
+ltwmc config bar_enable 1
+ltwmc config bar_height 28
+ltwmc config bar_padding_x 6
+ltwmc config bar_font 'JetBrains Mono:size=12'
 
-# ── spawn tất cả autostart apps song song ───────────────────
-# Đặt lệnh này CUỐI CÙNG, sau khi đã queue đủ hết.
-ltwmc autostart_run
+# read pywal colors if available, fall back to catppuccin mocha
+. "${HOME}/.cache/wal/colors.sh" 2>/dev/null || true
+ltwmc config bar_bg             "${color0:-#1E1E2E}"
+ltwmc config bar_fg             "${foreground:-#CDD6F4}"
+ltwmc config bar_ws_active_bg   "${color4:-#89B4FA}"
+ltwmc config bar_ws_active_fg   "${color0:-#1E1E2E}"
+ltwmc config bar_ws_occupied_bg "${color8:-#313244}"
+ltwmc config bar_ws_occupied_fg "${foreground:-#CDD6F4}"
+
+ltwmc config bar_show_layout  1
+ltwmc config bar_show_version 0
+
+# right-side commands
+ltwmc config bar_clear_cmds
+ltwmc config bar_cmd_sep ' | '
+ltwmc config bar_add_cmd 'iwgetid -r 2>/dev/null || echo "--"'
+ltwmc config bar_add_cmd 'amixer get Master 2>/dev/null | grep -oP "\d+(?=%)" | tail -1 | sed "s/^/vol: /"'
+ltwmc config bar_add_cmd 'cat /sys/class/power_supply/BAT0/capacity 2>/dev/null | sed "s/$/%/" || true'
+ltwmc config bar_add_cmd 'date "+%H:%M  %a %d/%m"'
+
+# create bar now — all config above is applied before window appears
+ltwmc config bar_commit
+
+# ── polybar IPC (when bar_enable 0) ─────────────────────────
+# Set polybar_pipe to your MODULE NAME — ltwm pushes hook directly to polybar socket.
+# ltwmc config polybar_pipe "ltwm-workspaces"
+
+# ── autostart ────────────────────────────────────────────────
+# ltwm event loop is already running — & works fine here.
+sxhkd &
+# polybar &   # uncomment if using polybar instead of native bar
+feh --bg-fill "${HOME}/Pictures/Wallpapers/other/CherryBlossom.png" &
+# picom --daemon &
+# dunst &
+# nm-applet &

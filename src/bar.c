@@ -24,20 +24,19 @@ static XftColor *xft_color(WM *wm, const char *hex) {
 }
 
 /* ── text width via Xft ─────────────────────────────────── */
-static int xft_tw(const char *s) {
-    if (!bar_font_xft || !s || !*s) return strlen(s) * 8;
-    XGlyphInfo ext;
-    XftTextExtentsUtf8(NULL, bar_font_xft, (FcChar8*)s, strlen(s), &ext);
-    return ext.xOff;
-}
-
-/* hacky but necessary — store display for xft_tw */
+/* hacky but necessary — store display for font measurement */
 static Display *g_dpy = NULL;
+
 static int xft_tw2(Display *dpy, const char *s) {
-    if (!bar_font_xft || !s || !*s) return strlen(s)*8;
+    if (!bar_font_xft || !s || !*s) return (int)strlen(s)*8;
     XGlyphInfo ext;
     XftTextExtentsUtf8(dpy, bar_font_xft, (FcChar8*)s, strlen(s), &ext);
     return ext.xOff;
+}
+
+/* wrapper dùng g_dpy — backward compat */
+static int xft_tw(const char *s) {
+    return xft_tw2(g_dpy, s);
 }
 
 /* ── create bar ─────────────────────────────────────────── */
@@ -57,11 +56,26 @@ void bar_create(WM *wm) {
         DefaultVisual(wm->dpy, wm->screen),
         CWBackPixel | CWOverrideRedirect | CWEventMask, &swa);
 
-    /* load Xft font — supports "IosevkaNerdFont:size=12" format */
+    /* load Xft font — thử theo thứ tự, log kết quả ra stderr */
     if (bar_font_xft) { XftFontClose(wm->dpy, bar_font_xft); bar_font_xft=NULL; }
     bar_font_xft = XftFontOpenName(wm->dpy, wm->screen, wm->cfg.bar_font);
+    if (bar_font_xft) {
+        fprintf(stderr, "ltwm: bar font loaded: %s\n", wm->cfg.bar_font);
+    } else {
+        fprintf(stderr, "ltwm: bar font FAILED: %s — trying fallbacks\n", wm->cfg.bar_font);
+        /* fallback chain */
+        const char *fallbacks[] = {
+            "monospace:size=12", "DejaVu Sans Mono:size=12",
+            "Liberation Mono:size=12", "fixed", NULL
+        };
+        for (int fi = 0; fallbacks[fi] && !bar_font_xft; fi++) {
+            bar_font_xft = XftFontOpenName(wm->dpy, wm->screen, fallbacks[fi]);
+            if (bar_font_xft)
+                fprintf(stderr, "ltwm: bar font fallback OK: %s\n", fallbacks[fi]);
+        }
+    }
     if (!bar_font_xft)
-        bar_font_xft = XftFontOpenName(wm->dpy, wm->screen, "monospace:size=10");
+        fprintf(stderr, "ltwm: bar font: ALL fallbacks failed, using pixel size\n");
 
     /* Xft draw on bar window */
     if (bar_draw_xft) { XftDrawDestroy(bar_draw_xft); bar_draw_xft=NULL; }

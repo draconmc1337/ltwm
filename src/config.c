@@ -22,8 +22,8 @@ void config_defaults(Config *cfg) {
     strncpy(cfg->col_bar_ws_occupied_bg, "313244", 15);
     strncpy(cfg->col_bar_ws_occupied_fg, "CDD6F4", 15);
     /* Xft format: "FontName:size=N" — hỗ trợ Nerd Fonts, Unicode, emoji
-       Fallback về monospace nếu IosevkaNerdFont chưa cài */
-    strncpy(cfg->bar_font, "IosevkaNerdFont:size=14", MAX_NAME_LEN-1);
+       Để trống — bar sẽ tạo sau khi ltwmrc set font qua `ltwmc config bar_font` */
+    strncpy(cfg->bar_font, "", MAX_NAME_LEN-1);
 
     cfg->border_width      = DEFAULT_BORDER_WIDTH;
     cfg->gap               = DEFAULT_GAP;
@@ -33,9 +33,8 @@ void config_defaults(Config *cfg) {
     cfg->mod1              = Mod1Mask;
 
     /* catppuccin mocha defaults — overridden by ltwmrc */
-    strncpy(cfg->col_border_normal,   "45475A", 15);
-    strncpy(cfg->col_border_focused,  "89B4FA", 15);
-    strncpy(cfg->col_border_floating, "A6E3A1", 15);
+    strncpy(cfg->col_border_active,   "89B4FA", 15);
+    strncpy(cfg->col_border_inactive, "45475A", 15);
 
     snprintf(cfg->terminal,    MAX_CMD_LEN-1, "kitty");
     snprintf(cfg->filemanager, MAX_CMD_LEN-1, "thunar");
@@ -47,9 +46,8 @@ void config_defaults(Config *cfg) {
 
 void config_apply_colors(WM *wm) {
     Config *cfg = &wm->cfg;
-    cfg->border_normal   = parse_color(wm->dpy, wm->screen, cfg->col_border_normal);
-    cfg->border_focused  = parse_color(wm->dpy, wm->screen, cfg->col_border_focused);
-    cfg->border_floating = parse_color(wm->dpy, wm->screen, cfg->col_border_floating);
+    cfg->border_active   = parse_color(wm->dpy, wm->screen, cfg->col_border_active);
+    cfg->border_inactive = parse_color(wm->dpy, wm->screen, cfg->col_border_inactive);
     cfg->bar_bg             = parse_color(wm->dpy, wm->screen, cfg->col_bar_bg);
     cfg->bar_fg             = parse_color(wm->dpy, wm->screen, cfg->col_bar_fg);
     cfg->bar_ws_active_bg   = parse_color(wm->dpy, wm->screen, cfg->col_bar_ws_active_bg);
